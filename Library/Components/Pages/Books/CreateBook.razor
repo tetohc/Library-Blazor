@@ -1,0 +1,61 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" Model="@book" Class="pa-4">
+            <MudText Typo="Typo.h6">Crear Libro</MudText>
+            <MudTextField @bind-Value="book.Title" Label="Título" Required="true" />
+            <MudTextField @bind-Value="book.Code" Label="Código" Required="true" />
+            <MudDatePicker Label="Fecha de publicación" @bind-Date="_date" />
+            <MudNumericField @bind-Value="book.Quantity" Label="Cantidad" Required="true" Min="1" />
+            <MudSelect T="Guid" @bind-Value="book.CategoryId" Label="Categoría" Placeholder="Seleccione una categoría" Required="true" Class="mt-2">
+                <MudSelectItem T="Guid" Value="Guid.Empty">Seleccione una categoría</MudSelectItem>
+                @foreach (var category in categories)
+                {
+                    <MudSelectItem T="Guid" Value="@category.Id">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton OnClick="@Save" Variant="Variant.Filled" Color="Color.Primary" Class="mt-5">
+                <MudIcon Icon="@Icons.Material.Filled.Save" />
+                Guardar
+            </MudButton>
+        </MudForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    private Book book = new();
+    private List<Category> categories = new();
+    private MudForm form = null!;
+    private DateTime? _date = DateTime.Today;
+
+    [Inject] private IRepository<Book> repository { get; set; } = null!;
+    [Inject] private IRepository<Category> categoryRepository { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = (await categoryRepository.GetAllAsync()).ToList();
+    }
+
+    private async Task Save()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            try
+            {
+                book.RegisterDate = DateTime.UtcNow;
+                book.ReleaseDate = (DateTime)_date;
+                await repository.AddAsync(book);
+                Snackbar.Add("Libro creado correctamente", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Ocurrió un error al guardar el libro: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

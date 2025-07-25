@@ -1,0 +1,109 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" Model="@loan" Class="pa-4">
+            <MudText Typo="Typo.h6">Crear Préstamo</MudText>
+
+            <MudSelect T="Guid" @bind-Value="loan.StudentId" Label="Estudiante" Required="true">
+                <MudSelectItem T="Guid" Value="Guid.Empty" Disabled="true">Seleccione un estudiante</MudSelectItem>
+                @foreach (var student in students)
+                {
+                    <MudSelectItem T="Guid" Value="@student.Id">@student.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="Guid" @bind-Value="loan.BookId" Label="Libro" Required="true">
+                <MudSelectItem T="Guid" Value="Guid.Empty" Disabled="true">Seleccione un libro</MudSelectItem>
+                @foreach (var book in books)
+                {
+                    <MudSelectItem T="Guid" Value="@book.Id">@book.Title</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudRadioGroup @bind-Value="SelectedOption">
+                <MudRadio Value="@("Pendiente")">Pendiente</MudRadio>
+                <MudRadio Value="@("Devuelto")">Devuelto</MudRadio>
+                <MudRadio Value="@("Vencido")">Vencido</MudRadio>
+            </MudRadioGroup>
+            <MudButton OnClick="@Save" Variant="Variant.Filled" Color="Color.Primary">
+                <MudIcon Icon="@Icons.Material.Filled.Save" />
+                Guardar
+            </MudButton>
+        </MudForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    private Loan loan = new();
+    private List<Student> students = new();
+    private List<Book> books = new();
+
+    private MudForm form = null!;
+    public string SelectedOption { get; set; } = string.Empty;
+
+    [Inject] private IRepository<Loan> loanRepository { get; set; } = null!;
+    [Inject] private IRepository<Student> studentRepository { get; set; } = null!;
+    [Inject] private IRepository<Book> bookRepository { get; set; } = null!;
+
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var studentsData = await studentRepository.GetAllAsync();
+            var booksData = await bookRepository.GetAllAsync();
+
+            students = studentsData.ToList();
+            books = booksData.ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error al obtener datos: {ex.Message}");
+        }
+    }
+
+    private async Task Save()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            try
+            {
+                await ConfirmStock();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Ocurrió un error al guardar el préstamo: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ConfirmStock()
+    {
+        try
+        {
+            var book = await bookRepository.GetByIdAsync(loan.BookId);
+            if (book != null)
+            {
+                if (book.Quantity <= 0)
+                {
+                    Snackbar.Add("No hay stock disponible para este libro.", Severity.Error);
+                    return;
+                }
+
+                book.Quantity--;
+                await bookRepository.UpdateAsync(book);
+                loan.Status = SelectedOption;
+                await loanRepository.AddAsync(loan);
+                Snackbar.Add("Préstamo creado exitosamente.", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al actualizar el stock: {ex.Message}", Severity.Error);
+        }
+    }
+}

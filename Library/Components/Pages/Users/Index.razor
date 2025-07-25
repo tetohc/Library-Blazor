@@ -1,0 +1,131 @@
+﻿@page "/users"
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-10">
+    <MudText Typo="Typo.h4" Class="text-center mb-6">Lista de usuarios</MudText>
+    <MudButton OnClick="AddUser" Variant="Variant.Outlined" Color="Color.Primary" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Add" />
+        Agregar Usuario
+    </MudButton>
+
+    @if (isLoading)
+    {
+        <Loading />
+    }
+    else
+    {
+        <MudTable Items="@users" Filter="new Func<User, bool>(FilterUsers)" Hover="true" Bordered="true" Striped="true" Dense="true">
+            <ToolBarContent>
+                <MudTextField @bind-Value="searchText" Placeholder="Buscar usuario..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="w-100 mt-0" />
+            </ToolBarContent>
+
+            <HeaderContent>
+                <MudTh>Nombre</MudTh>
+                <MudTh>Correo electrónico</MudTh>
+                <MudTh>Fecha de creación</MudTh>
+                <MudTh>Rol</MudTh>
+                <MudTh>Acciones</MudTh>
+            </HeaderContent>
+
+            <RowTemplate>
+                <MudTd DataLabel="Nombre">@context.Name</MudTd>
+                <MudTd DataLabel="Correo electrónico">@context.Email</MudTd>
+                <MudTd DataLabel="Fecha de creación">@context.RegisterDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Rol">@context.Role</MudTd>
+                <MudTd DataLabel="Acciones">
+                    <MudTooltip Text="Menú de acciones" Color="Color.Primary" Arrow="true" Placement="Placement.Top">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Abrir menú de acciones">
+                            <MudMenuItem OnClick="() => UserDelete(context.Id)" Icon="@Icons.Material.Filled.Delete" Label="Eliminar" />
+                        </MudMenu>
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Filas por página" InfoFormat="{first_item}-{last_item} de {all_items}" />
+            </PagerContent>
+
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<User> users = new();
+    private string searchText = string.Empty;
+    private bool isLoading = true;
+
+    [Inject] private IRepository<User> repository { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var data = await repository.GetAllAsync();
+            users = data.ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar los usuarios: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool FilterUsers(User user)
+    {
+        return string.IsNullOrEmpty(searchText) ||
+               user.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+               user.Role.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+               user.Email.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task AddUser()
+    {
+        try
+        {
+            var parameters = new DialogParameters();
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<CreateUser>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                NavigationManager.NavigateTo("/users");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task UserDelete(Guid id)
+    {
+        try
+        {
+            var parameters = new DialogParameters { ["Id"] = id };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<DeleteUser>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                Snackbar.Add("Usuario eliminado correctamente", Severity.Success);
+                NavigationManager.NavigateTo("/users");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al intentar eliminar: {ex.Message}", Severity.Error);
+        }
+    }
+}

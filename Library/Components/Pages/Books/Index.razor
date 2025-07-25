@@ -1,0 +1,149 @@
+﻿@page "/books"
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-10">
+    <MudText Typo="Typo.h4" Class="text-center mb-6">Listado de Libros</MudText>
+    <MudButton OnClick="AddBook" Variant="Variant.Outlined" Color="Color.Primary" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Add" />
+        Agregar Libro
+    </MudButton>
+
+    @if (isLoading)
+    {
+        <Loading />
+    }
+    else
+    {
+        <MudTable Items="@books" Filter="new Func<Book, bool>(FilterBooks)" Hover="true" Bordered="true" Striped="true" Dense="true">
+            <ToolBarContent>
+                <MudTextField @bind-Value="searchText" Placeholder="Buscar libro..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="w-100 mt-0" />
+            </ToolBarContent>
+
+            <HeaderContent>
+                <MudTd>Código</MudTd>
+                <MudTh>Título</MudTh>
+                <MudTh>Fecha de publicación</MudTh>
+                <MudTh>Cantidad</MudTh>
+                <MudTh>Categoría</MudTh>
+                <MudTh>Acciones</MudTh>
+            </HeaderContent>
+
+            <RowTemplate>
+                <MudTd DataLabel="Código">@context.Code</MudTd>
+                <MudTd DataLabel="Título">@context.Title</MudTd>
+                <MudTd DataLabel="Publicado">@context.ReleaseDate?.ToLongDateString()</MudTd>
+                <MudTd DataLabel="Cantidad">@context.Quantity</MudTd>
+                <MudTd DataLabel="Categoría">@context.Category.Name</MudTd>
+                <MudTd DataLabel="Acciones">
+                    <MudTooltip Text="Menú de acciones" Color="Color.Primary" Arrow="true" Placement="Placement.Top">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Abri menú de acciones">
+                            <MudMenuItem OnClick="() => BookUpdate(context.Id)" Icon="@Icons.Material.Filled.Edit" Label="Editar" />
+                            <MudMenuItem OnClick="() => BookDelete(context.Id)" Icon="@Icons.Material.Filled.Delete" Label="Eliminar" />
+                        </MudMenu>
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Filas por página" InfoFormat="{first_item}-{last_item} de {all_items}" />
+            </PagerContent>
+
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<Book> books = new();
+    private string searchText = string.Empty;
+    private bool isLoading = true;
+
+    [Inject] private IRepository<Book> repository { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        var data = await repository.GetAllAsyncWithIncludesAsync(x => x.Category);
+        books = data.ToList();
+        isLoading = false;
+    }
+
+    private bool FilterBooks(Book book)
+    {
+        return string.IsNullOrEmpty(searchText) ||
+               book.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    #region CUD
+
+    public async Task AddBook()
+    {
+        try
+        {
+            var parameters = new DialogParameters();
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<CreateBook>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                NavigationManager.NavigateTo("/books");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public async Task BookUpdate(Guid id)
+    {
+        try
+        {
+            var parameters = new DialogParameters { ["Id"] = id };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<UpdateBook>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                Snackbar.Add("Libro actualizado correctamente.", Severity.Success);
+                NavigationManager.NavigateTo("/books");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al intentar actualizar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task BookDelete(Guid id)
+    {
+        try
+        {
+            var parameters = new DialogParameters { ["Id"] = id };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<DeleteBook>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                Snackbar.Add("Libro eliminado correctamente.", Severity.Success);
+                NavigationManager.NavigateTo("/books");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al intentar eliminar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    #endregion CUD
+}

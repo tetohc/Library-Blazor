@@ -1,0 +1,82 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" Model="@loan" Class="pa-4">
+            <MudText Typo="Typo.h6">Actualizar Préstamo</MudText>
+
+            <MudSelect T="Guid" @bind-Value="loan.StudentId" Label="Estudiante" Required="true">
+                @foreach (var student in students)
+                {
+                    <MudSelectItem T="Guid" Value="@student.Id">@student.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="Guid" @bind-Value="loan.BookId" Label="Libro" Required="true">
+                @foreach (var book in books)
+                {
+                    <MudSelectItem T="Guid" Value="@book.Id">@book.Title</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudRadioGroup @bind-Value="SelectedOption">
+                <MudRadio Value="@("Pendiente")">Pendiente</MudRadio>
+                <MudRadio Value="@("Devuelto")">Devuelto</MudRadio>
+                <MudRadio Value="@("Vencido")">Vencido</MudRadio>
+            </MudRadioGroup>
+            <MudButton OnClick="@Save" Variant="Variant.Filled" Color="Color.Primary">
+                <MudIcon Icon="@Icons.Material.Filled.Save" />
+                Guardar
+            </MudButton>
+        </MudForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private List<Student> students = [];
+    private List<Book> books = [];
+    private Loan loan = new();
+    public string SelectedOption { get; set; } = string.Empty;
+
+    [Inject] private IRepository<Loan> loanRepository { get; set; } = null!;
+    [Inject] private IRepository<Student> studentRepository { get; set; } = null!;
+    [Inject] private IRepository<Book> bookRepository { get; set; } = null!;
+
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    private MudForm form = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            students = (await studentRepository.GetAllAsync()).ToList();
+            books = (await bookRepository.GetAllAsync()).ToList();
+            loan = await loanRepository.GetByIdAsync(Id);
+            SelectedOption = loan.Status;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar los datos del libro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Save()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            try
+            {
+                loan.Status = SelectedOption;
+                await loanRepository.UpdateAsync(loan);
+                MudDialog.Close(DialogResult.Ok(loan));
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Ocurrió un error al actualizar el préstamo: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

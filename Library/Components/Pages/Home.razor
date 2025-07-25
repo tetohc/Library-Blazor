@@ -1,0 +1,63 @@
+﻿@page "/home"
+
+<PageTitle>Biblioteca</PageTitle>
+
+
+<MudContainer MaxWidth="MaxWidth.False" Class="mt-4">
+    <MudGrid GutterSize="3">
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Outlined="true">
+                <MudCardContent>
+                    <MudText Typo="Typo.h5">Libros</MudText>
+                    <MudText Typo="Typo.body2">Gestiona el catálogo de libros: añade, edita y organiza títulos disponibles.</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton OnClick="NavigateToBooks" Variant="Variant.Text" Color="Color.Primary">Ver más</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Outlined="true">
+                <MudCardContent>
+                    <MudText Typo="Typo.h5">Estudiantes</MudText>
+                    <MudText Typo="Typo.body2">Administra la información de los estudiantes.</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton OnClick="NavigateToStudents" Variant="Variant.Text" Color="Color.Primary">Ver más</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Outlined="true">
+                <MudCardContent>
+                    <MudText Typo="Typo.h5">Préstamos</MudText>
+                    <MudText Typo="Typo.body2">Registro de préstamos: asignaciones, fechas de devolución y seguimiento.</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton OnClick="NavigateToLoans" Variant="Variant.Text" Color="Color.Primary">Ver más</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+
+    private void NavigateToBooks()
+    {
+        NavigationManager.NavigateTo("/books");
+    }
+
+    private void NavigateToStudents()
+    {
+        NavigationManager.NavigateTo("/students");
+    }
+
+    private void NavigateToLoans()
+    {
+        NavigationManager.NavigateTo("/loans");
+    }
+}

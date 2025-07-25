@@ -1,0 +1,38 @@
+﻿@page "/"
+@layout LoginLayout
+
+@inject LoginService LoginService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
+
+<MudPaper Class="pa-6 mx-auto" MaxWidth="400px">
+    <MudText Typo="Typo.h5" Class="mb-4 text-center">Inicio de Sesión</MudText>
+    <MudTextField @bind-Value="login.Email" Label="Correo electrónico" Required="true"
+                  RequiredError="El correo electrónico es requerido!" HelperText="Escriba su correo electrónico."
+                  Validation="@(new EmailAddressAttribute() { ErrorMessage = "El correo electrónico es inválido." })" />
+    <MudTextField @bind-Value="login.Password" InputType="InputType.Password" Label="Contraseña" Required="true"
+                  RequiredError="La contraseña es requerida!" HelperText="Escriba su contraseña." />
+    <MudButton OnClick="OnLogin" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" FullWidth="true">Ingresar</MudButton>
+</MudPaper>
+
+
+@code {
+    private LoginDto login = new();
+
+    private async Task OnLogin()
+    {
+        var result = await LoginService.LoginAsync(email: login.Email, password: login.Password);
+        if (result)
+        {
+            Snackbar.Add("¡Bienvenido!", Severity.Success);
+            NavigationManager.NavigateTo("/home");
+        }
+        else
+        {
+            Snackbar.Add("El correo o la contraseña son incorrectos.", Severity.Error);
+        }
+    }
+}

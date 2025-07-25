@@ -1,0 +1,157 @@
+﻿@page "/students"
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-10">
+    <MudText Typo="Typo.h4" Class="text-center mb-6">Lista de estudiantes</MudText>
+    <MudButton OnClick="AddStudent" Variant="Variant.Outlined" Color="Color.Primary" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Add" />
+        Agregar Estudiante
+    </MudButton>
+
+    @if (isLoading)
+    {
+        <Loading />
+    }
+    else
+    {
+        <MudTable Items="@students" Filter="new Func<Student, bool>(FilterStudents)" Hover="true" Bordered="true" Striped="true" Dense="true">
+            <ToolBarContent>
+                <MudTextField @bind-Value="searchText" Placeholder="Buscar estudiante..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="w-100 mt-0" />
+            </ToolBarContent>
+
+            <HeaderContent>
+                <MudTh>Nombre</MudTh>
+                <MudTh>Código</MudTh>
+                <MudTh>Fecha de creación</MudTh>
+                <MudTh>Acciones</MudTh>
+            </HeaderContent>
+
+            <RowTemplate>
+                <MudTd DataLabel="Nombre">@context.Name</MudTd>
+                <MudTd DataLabel="Código">@context.Code</MudTd>
+                <MudTd DataLabel="Fecha de creación">@context.RegisterDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Acciones">
+                    <MudTooltip Text="Menú de acciones" Color="Color.Primary" Arrow="true" Placement="Placement.Top">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Abri menú de acciones">
+                            <MudMenuItem OnClick="() => StudentUpdate(context.Id)" Icon="@Icons.Material.Filled.Edit" Label="Editar" />
+                            <MudMenuItem OnClick="() => StudentDelete(context.Id)" Icon="@Icons.Material.Filled.Delete" Label="Eliminar" />
+                        </MudMenu>
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Filas por página" InfoFormat="{first_item}-{last_item} de {all_items}" />
+            </PagerContent>
+
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<Student> students = new();
+    private string searchText = string.Empty;
+    private bool isLoading = true;
+
+    [Inject] private IRepository<Student> repository { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+
+    // cargar lista
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var data = await repository.GetAllAsync();
+            students = data.ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar los estudiantes: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool FilterStudents(Student student)
+    {
+        return string.IsNullOrEmpty(searchText) ||
+               student.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+               student.Code.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    #region CUD
+
+    private async Task AddStudent()
+    {
+        try
+        {
+            var parameters = new DialogParameters();
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<CreateStudent>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                NavigationManager.NavigateTo("/students");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StudentUpdate(Guid id)
+    {
+        try
+        {
+            var parameters = new DialogParameters { ["Id"] = id };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<UpdateStudent>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                Snackbar.Add("Estudiante actualizado correctamente", Severity.Success);
+                NavigationManager.NavigateTo("/students");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al intentar actualizar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StudentDelete(Guid id)
+    {
+        try
+        {
+            var parameters = new DialogParameters { ["Id"] = id };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<DeleteStudent>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                Snackbar.Add("Estudiante eliminado correctamente", Severity.Success);
+                NavigationManager.NavigateTo("/students");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al intentar eliminar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    #endregion CUD
+}

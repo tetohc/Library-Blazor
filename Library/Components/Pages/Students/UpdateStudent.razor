@@ -1,0 +1,57 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" Model="@student" Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-4">Actualizar Estudiante</MudText>
+
+            <MudTextField @bind-Value="student.Name" Label="Nombre" Required="true" />
+            <MudTextField @bind-Value="student.Code" Label="Código" Required="true" />
+
+            <MudButton OnClick="@Save" Variant="Variant.Filled" Color="Color.Primary" Class="mt-5">
+                <MudIcon Icon="@Icons.Material.Filled.Save" />
+                Guardar
+            </MudButton>
+        </MudForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private Student student = new Student();
+
+    [Inject] private IRepository<Student> repository { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    private MudForm form = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            student = await repository.GetByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al cargar el estudiante: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Save()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            try
+            {
+                await repository.UpdateAsync(student);
+                MudDialog.Close(DialogResult.Ok(student));
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Ocurrió un error al guardar el estudiante actualizado: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

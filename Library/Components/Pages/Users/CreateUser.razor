@@ -1,0 +1,41 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" Model="@user" Class="pa-4">
+            <MudText Typo="Typo.h6">Crear usuario</MudText>
+            <MudTextField @bind-Value="user.Name" Label="Nombre" Required="true" For="@(() => user.Name)" />
+            <MudTextField @bind-Value="user.Email" Label="Correo electrónico" Required="true" For="@(() => user.Email)" />
+            <MudTextField @bind-Value="user.Password" Label="Contraseña" Required="true" For="@(() => user.Password)" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@Save" Class="mt-6">Guardar</MudButton>
+        </MudForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    private User user = new();
+
+    [Inject] private IRepository<User> repository { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    private MudForm form = null!;
+
+    private async Task Save()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            try
+            {
+                user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
+                await repository.AddAsync(user);
+                Snackbar.Add("Usuario creado correctamente", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Ocurrió un error al guardar el usuario: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

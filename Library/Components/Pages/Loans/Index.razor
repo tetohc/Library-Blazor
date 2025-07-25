@@ -1,0 +1,211 @@
+﻿@page "/loans"
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-10">
+    <MudText Typo="Typo.h4" Class="text-center mb-6">Préstamo de Libros</MudText>
+    <MudButton OnClick="AddLoan" Variant="Variant.Outlined" Color="Color.Primary" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Add" />
+        Agregar Préstamo
+    </MudButton>
+
+    @if (isLoading)
+    {
+        <Loading />
+    }
+    else
+    {
+        <MudTable Items="@loans" Filter="new Func<Loan, bool>(FilterLoans)" Hover="true" Bordered="true" Striped="true" Dense="true">
+            <ToolBarContent>
+                <MudTextField @bind-Value="searchText" Placeholder="Búsqueda por libro" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="w-100 mt-0" />
+            </ToolBarContent>
+
+            <HeaderContent>
+                <MudTd>Libro</MudTd>
+                <MudTh>Estudiante</MudTh>
+                <MudTh>Fecha de préstamo</MudTh>
+                <MudTh>Fecha de devolución</MudTh>
+                <MudTh>Estado</MudTh>
+                <MudTh>Acciones</MudTh>
+            </HeaderContent>
+
+            <RowTemplate>
+                <MudTd DataLabel="Libro">@context.Book!.Title</MudTd>
+                <MudTd DataLabel="Estudiante">@context.Student!.Name</MudTd>
+                <MudTd DataLabel="Fecha de préstamo">@context.LoanDate.ToLongDateString()</MudTd>
+                <MudTd DataLabel="Fecha de devolución">@context.ReturnDate.ToLongDateString()</MudTd>
+                <MudTd DataLabel="Estado">
+                    <MudChip T="string" Color="@GetColorState(@context.Status)" Variant="Variant.Filled">@context.Status</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Acciones">
+                    <MudTooltip Text="Menú de acciones" Color="Color.Primary" Arrow="true" Placement="Placement.Top">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Abri menú de acciones">
+                            <MudMenuItem OnClick="() => LoanUpdate(context.Id)" Icon="@Icons.Material.Filled.Edit" Label="Editar" />
+                            <MudMenuItem OnClick="() => ReturnLoan(context.Id)" Icon="@Icons.Material.Filled.AssignmentReturn" Label="Devolver" />
+                        </MudMenu>
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Filas por página" InfoFormat="{first_item}-{last_item} de {all_items}" />
+            </PagerContent>
+
+        </MudTable>
+    }
+
+</MudContainer>
+
+@code {
+    private List<Loan> loans = new();
+    private Loan loan = new();
+    private string searchText = string.Empty;
+    private bool isLoading = true;
+
+    [Inject] private IRepository<Loan> repository { get; set; } = null!;
+    [Inject] private IRepository<Book> bookRepository { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var data = await repository.GetAllAsyncWithIncludesAsync(x => x.Book!, x => x.Student);
+            loans = data.OrderByDescending(x => x.LoanDate).ToList();
+
+            foreach (var item in loans)
+            {
+                await ValidateState();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar los préstamos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ValidateState()
+    {
+        if (loan.Status == "Pendiente" && loan.ReturnDate < DateTime.Now)
+        {
+            loan.Status = "Vencido";
+            await repository.UpdateAsync(loan);
+        }
+    }
+
+    private bool FilterLoans(Loan loan)
+       => string.IsNullOrWhiteSpace(searchText) || loan.Book!.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+
+    #region CUD
+
+    private async Task AddLoan()
+    {
+        try
+        {
+            var parameters = new DialogParameters();
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<CreateLoan>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                NavigationManager.NavigateTo("/loans");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public async Task LoanUpdate(Guid id)
+    {
+        try
+        {
+            var parameters = new DialogParameters { ["Id"] = id };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+            var dialog = await DialogService.ShowAsync<UpdateLoan>("", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result!.Canceled)
+            {
+                await OnInitializedAsync();
+                Snackbar.Add("Préstamo de libro actualizado correctamente.", Severity.Success);
+                NavigationManager.NavigateTo("/loans");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al intentar actualizar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ReturnLoan(Guid id)
+    {
+        loan = await repository.GetByIdAsync(id);
+        try
+        {
+            if (loan != null)
+            {
+                loan.ReturnDate = DateTime.Now;
+                loan.Status = "Devuelto";
+
+                await UpdateStore();
+                await repository.UpdateAsync(loan);
+
+                Snackbar.Add("Libro devuelto correctamente.", Severity.Success);
+                await OnInitializedAsync();
+            }
+            else
+            {
+                Snackbar.Add("No se encontró el préstamo.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al intentar devolver el préstamo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    #endregion CUD
+
+    private async Task UpdateStore()
+    {
+        try
+        {
+            var book = await bookRepository.GetByIdAsync(loan.BookId);
+            if (book != null)
+            {
+                book.Quantity += 1;
+                await bookRepository.UpdateAsync(book);
+            }
+            else
+            {
+                Snackbar.Add("No se encontró el libro asociado al préstamo.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al intentar actualizar el stock: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetColorState(string status)
+    {
+        return status switch
+        {
+            "Pendiente" => Color.Warning,
+            "Devuelto" => Color.Success,
+            "Vencido" => Color.Error,
+            _ => Color.Default
+        };
+    }
+}

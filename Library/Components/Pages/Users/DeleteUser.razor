@@ -1,0 +1,50 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Eliminar Usuario</MudText>
+        <MudText>¿Estás seguro de que deseas eliminar al usuario <strong>@user.Name</strong>?</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@Delete" Variant="Variant.Outlined" Color="Color.Error">Sí, eliminar</MudButton>
+        <MudButton OnClick="@Cancel" Variant="Variant.Outlined" Color="Color.Secondary">No, cancelar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private User user = new User();
+
+    [Inject] private IRepository<User> repository { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            user = await repository.GetByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar el usuario: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Delete()
+    {
+        try
+        {
+            await repository.DeleteAsync(user.Id);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ocurrió un error al eliminar el estudiante: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}
